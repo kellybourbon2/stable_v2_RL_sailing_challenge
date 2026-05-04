@@ -1,5 +1,5 @@
 """
-Utility functions for saving and loading agents.
+Utility functions for saving, loading and training agents.
 
 These functions help create standalone Python files for agent submission.
 """
@@ -124,3 +124,5 @@ class {agent_class_name}(BaseAgent):
     print(f"Agent saved to {output_path}")
     print(f"The file contains {len(agent.q_table)} state-action pairs.")
     print(f"You can now use this file with validate_agent.ipynb and evaluate_agent.ipynb")
+
+
