@@ -129,7 +129,7 @@ def train_dqn_agent(agent, wind_scenarios, num_episodes, save_path, physics_sail
                 observation = augment_obs(next_observation)
             else:
                 observation = next_observation
-            total_reward += reward
+            total_reward += shaped_reward
 
             if done or truncated:
                 break

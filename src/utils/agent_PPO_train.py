@@ -101,7 +101,7 @@ def train_ppo_agent(agent, wind_scenarios, num_episodes, save_path, physics_sail
             )
 
             observation    = next_obs_store
-            total_reward  += reward
+            total_reward  += shaped_reward
             steps_since_update += 1
 
             # ── PPO update: triggered every rollout_steps ─────────────────────
