@@ -71,7 +71,7 @@ def train_dqn_agent(agent, wind_scenarios, num_episodes, save_path, physics_sail
     best_avg_steps    = float('inf')
     best_weights      = None
     no_improve        = 0
-    patience          = 5
+    patience          = 10
     best_per_scenario = {name: 0.0 for name in scenario_names}
 
     # ── Adaptive lr/decay thresholds ──────────────────────────────────────────
@@ -109,12 +109,11 @@ def train_dqn_agent(agent, wind_scenarios, num_episodes, save_path, physics_sail
             action = agent.act(observation)
             next_observation, reward, done, truncated, info = env.step(action)
 
-            # Reward shaping -----------------
+            # Reward shaping — normalized to [-1, +2] to prevent Q-value explosion.
             curr_dist     = np.linalg.norm(info['position'] - goal)
-            shaped_reward = reward + (prev_dist - curr_dist) * 0.01  
-
+            shaped_reward = reward / 100.0 + 0.01 * (prev_dist - curr_dist)
             if info.get('is_stuck', False):
-                shaped_reward = -50.0
+                shaped_reward = -1.0
             prev_dist = curr_dist
 
             loss = agent.learn(
@@ -346,7 +345,16 @@ if __name__ == "__main__":
     num_actions = sample_env.action_space.n
     sample_env.close()
 
-    agent = DQNAgent(num_actions=num_actions, checkpoint_path=None)
+    save_path = Path(__file__).resolve().parent.parent / "agents" / "dqn_cnn.pt"
+
+    # Note: physics_sail=True is disabled — augment_obs appends efficiencies at
+    # position 49158+ but the network forward() only reads up to 49157, so the
+    # extra features were silently ignored. Disabled to avoid confusion.
+    agent = DQNAgent(
+        num_actions       = num_actions,
+        checkpoint_path   = None,
+        exploration_decay = 0.997,   # reaches min ~ep 1000 (was 0.9995 → 0.60 at ep 2000)
+    )
 
     wind_scenarios = {
         'training_1': get_wind_scenario('training_1'),
@@ -357,7 +365,7 @@ if __name__ == "__main__":
     metrics = train_dqn_agent(
         agent,
         wind_scenarios,
-        num_episodes=2000,
-        physics_sail=True,
-        save_path='dqn_agent_early_stopping_balanced_buffer_physics_sail.pt'
+        num_episodes = 4000,
+        physics_sail = False,
+        save_path    = str(save_path),
     )

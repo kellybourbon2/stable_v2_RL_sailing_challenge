@@ -111,6 +111,11 @@ class DQNNetwork(nn.Module):
             nn.Linear(64, num_actions),
         )
 
+        for m in self.modules():
+            if isinstance(m, (nn.Linear, nn.Conv2d)):
+                nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+                nn.init.zeros_(m.bias)
+
     def forward(self, x):
         scalar     = x[:,         :6            ]   # (batch, 6)
         wind_flat  = x[:, 6       :6+32768      ]   # (batch, 32768)
@@ -227,13 +232,15 @@ class DQNAgent(BaseAgent):
         q_values = self.online_net(states_t).gather(1, actions_t.unsqueeze(1)).squeeze(1)
 
         with torch.no_grad():
-            next_q  = self.target_net(next_states_t).max(dim=1).values
+            # Double DQN: online net picks action, target net evaluates it
+            best_a  = self.online_net(next_states_t).argmax(dim=1, keepdim=True)
+            next_q  = self.target_net(next_states_t).gather(1, best_a).squeeze(1)
             targets = rewards_t + self.gamma * next_q * (1.0 - dones_t)
 
         loss = self.loss_fn(q_values, targets)
         self.optimizer.zero_grad()
         loss.backward()
-        nn.utils.clip_grad_norm_(self.online_net.parameters(), max_norm=10.0)
+        nn.utils.clip_grad_norm_(self.online_net.parameters(), max_norm=1.0)
         self.optimizer.step()
 
         if self._step_count % self.target_update_freq == 0:
@@ -246,6 +253,10 @@ class DQNAgent(BaseAgent):
             self.exploration_min,
             self.exploration_rate * self.exploration_decay
         )
+
+    def get_numpy_weights(self) -> dict:
+        """Return all network weights as numpy arrays (for numpy submission export)."""
+        return {k: v.cpu().numpy() for k, v in self.online_net.state_dict().items()}
 
     def save(self, path):
         torch.save({
